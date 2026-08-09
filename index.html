@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open-Source Information Validator - Archive</title>
+<style>
+  :root {
+    --bg: #17181a;
+    --sidebar-bg: #101112;
+    --panel-bg: #26282b;
+    --panel-border: #3a3d41;
+    --text: #e6e6e6;
+    --text-muted: #9a9da2;
+    --text-dim: #6b6e73;
+    --accent: #6fa8dc;
+    --accent-hover: #8cbceb;
+    --warning-bg: #3a2a1a;
+    --warning-border: #7a5a2a;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
+
+  .app-layout { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 260px; flex-shrink: 0; background: var(--sidebar-bg);
+    border-right: 1px solid var(--panel-border); padding: 16px 12px;
+    height: 100vh; position: sticky; top: 0; overflow-y: auto;
+  }
+  body.sidebar-collapsed .sidebar { display: none; }
+
+  .sidebar-header { display: flex; align-items: center; justify-content: space-between; margin: 4px 4px 10px; }
+  .sidebar-header h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 0; }
+  #sidebar-collapse-btn {
+    margin: 0; padding: 2px 8px; font-size: 0.85rem; font-weight: 400;
+    background: transparent; color: var(--text-muted); border: 1px solid var(--panel-border);
+  }
+  #sidebar-collapse-btn:hover { background: var(--panel-bg); color: var(--text); }
+
+  #sidebar-show-btn {
+    display: none; position: fixed; top: 16px; left: 12px; z-index: 10;
+    padding: 6px 10px; margin: 0; font-size: 0.85rem; font-weight: 400;
+    background: var(--panel-bg); color: var(--text); border: 1px solid var(--panel-border);
+  }
+  body.sidebar-collapsed #sidebar-show-btn { display: block; }
+
+  .run-list { margin-top: 4px; }
+  .run-item {
+    position: relative; padding: 10px 26px 10px 10px; border-radius: 6px; cursor: pointer; margin-bottom: 2px;
+    border-left: 3px solid transparent;
+  }
+  .run-item:hover { background: var(--panel-bg); }
+  .run-item.active { background: var(--panel-bg); border-left-color: var(--accent); }
+  .run-item .run-title {
+    font-weight: 600; font-size: 0.85rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .run-item .run-outlet { color: var(--text-muted); font-size: 0.8rem; margin-top: 2px; }
+  .run-item .run-date { color: var(--text-muted); font-size: 0.72rem; margin-top: 3px; }
+  .run-item .run-hide-btn {
+    position: absolute; top: 6px; right: 4px; background: transparent; border: none;
+    color: var(--text-muted); font-size: 1rem; line-height: 1; padding: 3px 7px;
+    border-radius: 4px; cursor: pointer; opacity: 0; transition: opacity 0.15s;
+  }
+  .run-item:hover .run-hide-btn { opacity: 1; }
+  .run-item .run-hide-btn:hover { background: var(--warning-bg); color: #f0d9b5; }
+  .run-item .run-unhide-btn:hover { background: var(--accent); color: #12181f; }
+  .run-list-empty { color: var(--text-muted); font-size: 0.85rem; padding: 8px 10px; }
+
+  .hidden-section-header {
+    margin-top: 18px; padding: 8px 10px; cursor: pointer; user-select: none;
+    color: var(--text-muted); font-size: 0.8rem; display: flex; align-items: center; gap: 6px;
+  }
+  .hidden-section-header:hover { color: var(--text); }
+  .hidden-run-list { display: none; }
+  .hidden-run-list.expanded { display: block; }
+  .hidden-run-list .run-item { opacity: 0.75; }
+
+  .main-content { flex: 1; min-width: 0; max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+
+  h1 { font-size: 1.4rem; margin-top: 0; margin-bottom: 4px; }
+  .demo-note { color: var(--text-muted); font-size: 0.9rem; margin-top: 0; }
+  #status { margin-top: 15px; margin-bottom: 15px; color: var(--text-muted); }
+  .result-block { margin-top: 30px; padding: 15px; background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 6px; }
+  .result-block h2 { margin-top: 0; font-size: 1.1rem; }
+  .subheading { color: var(--text-muted); font-style: italic; font-size: 0.9rem; margin-bottom: 12px; }
+  .meta { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px; }
+  .meta a { color: var(--accent); }
+
+  .overview-list { margin: 0; padding-left: 20px; }
+  .overview-list li { margin-bottom: 6px; line-height: 1.4; }
+
+  .qa { margin-bottom: 20px; }
+  .qa:last-child { margin-bottom: 0; }
+  .qa .question { font-weight: 600; font-size: 1.1rem; margin-bottom: 7px; }
+  .qa .answer { margin: 0; line-height: 1.5; white-space: pre-wrap; }
+  .qa .answer a { color: var(--accent); }
+  .qa .answer a:hover { color: var(--accent-hover); }
+
+  .raw-fallback-note { color: var(--text-muted); font-style: italic; font-size: 0.85rem; margin-bottom: 8px; }
+  .raw-fallback { white-space: pre-wrap; line-height: 1.5; }
+  .raw-fallback a { color: var(--accent); }
+
+  footer {
+    margin-top: 50px; padding-top: 15px; border-top: 1px solid var(--panel-border);
+    color: var(--text-muted); font-size: 0.85rem; text-align: center;
+  }
+  footer a { color: var(--accent); }
+  footer a:hover { color: var(--accent-hover); }
+  footer .footer-paper { color: var(--text-dim); font-style: italic; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<button id="sidebar-show-btn" onclick="toggleSidebar()">&raquo; Archive</button>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>Archive</h2>
+      <button id="sidebar-collapse-btn" onclick="toggleSidebar()">&laquo;</button>
+    </div>
+    <div id="run-list" class="run-list"></div>
+    <div id="hidden-section-header" class="hidden-section-header" onclick="toggleHiddenSection()">
+      <span id="hidden-toggle-icon">&#9656;</span> <span id="hidden-count-label">Hidden (0)</span>
+    </div>
+    <div id="hidden-run-list" class="run-list hidden-run-list"></div>
+  </aside>
+
+  <main class="main-content">
+    <h1>Open-Source Information Validator</h1>
+    <p class="demo-note">Archive of past source-validation runs. This is a static demo -- no new URLs can be submitted here.</p>
+
+    <div id="status"></div>
+    <div id="results"></div>
+
+    <footer>
+      Prepared by <a href="https://ridgeway-information.com" target="_blank" rel="noopener noreferrer">Ridgeway Information</a>
+      for the IAEA International Symposium on Nuclear Safeguards 2026
+      <div class="footer-paper">Paper: Validating Open-Source Information for Safeguards Analysis: A Locally-Deployed Automated Pipeline</div>
+    </footer>
+  </main>
+</div>
+
+<script>
+const RUNS = [{"run_id": 14, "run_date": "2026-08-09T20:24:53.387775+00:00", "url": "https://portal.fgv.br/en/news/research-reveals-case-serious-military-threat-nuclear-option-polarizes-brazilian-society", "outlet_domain": "portal.fgv.br", "article_title": "Research reveals that, in the case of a serious military threat, the nuclear option polarizes Brazilian society", "extraction_method": "playwright_fallback", "overview_bullets": ["The source demonstrates internal logical coherence by aligning general survey data with conditional security scenarios, such as explaining how US protection reduces polarization from 47% to 27%, without contradictory claims in the historical context provided.", "Formatting and language quality show irregularities at the conclusion of the text where Portuguese phrases like 'Leia também' appear amidst English body paragraphs, disrupting consistent linguistic standards across all sections.", "The article cites a survey funded by the Stanton Foundation (Q6A) that interviewed over 2,000 Brazilians about nuclear proliferation preferences; however, all six search queries returned no results, so external verification for primary source traceability is unavailable.", "The outlet portal.fgv.br (Q5A/Q5B) hosts research by Fundação Getulio Vargas and its School of International Relations; the search tool failed to return data on reputation or past misinformation incidents for this domain.", "The study references international partners such as Vanderbilt University researchers Guilherme Fasolin and Juliana Camargo (Q3A), but external confirmation via web search was not obtained due to tool limitations."], "agent1_qa": [{"question": "Is there internal consistency and logical coherence in the information contained within the source?", "answer": "The information within the source appears internally consistent without significant logical contradictions between claims or conclusions. For instance, Section regarding U.S. military influence states a promise of protection from the United States would reduce support to 27%, while earlier sections note that in threatening circumstances support rises to 47%; these figures align logically under the condition described by Matias Spektor where an opinion is malleable depending on external security context. The methodology explanation supports this coherence, noting researchers did not identify aggressor countries specifically because 'If we identified an aggressor country by name, our result would lose precision,' which explains why general threats are used rather than specific nation names in the results."}, {"question": "Is the presentation of information internally consistent and high quality? (formatting, grammar, language)", "answer": "The presentation of information displays inconsistent formatting quality and language standards particularly regarding terminology. While most headers like U.S. military influence over Brazil maintain a clear English structure throughout sections discussing survey methodology, there is an irregularity found at the very end where the text includes 'Leia também,' which breaks consistency by introducing Portuguese into otherwise uniform paragraphs. Spelling and grammar appear generally standard for journalistic reporting across body text explaining FGV data collection, though this phrase serves as evidence of translation or copy-paste inconsistency that undermines strict formatting standards observed in earlier sections."}, {"question": "Does the source contain a balanced presentation of information, free from description bias?", "answer": "The source demonstrates a relatively balanced presentation free from strong description bias toward a particular viewpoint despite the sensitive subject matter. Language such as 'specter of nuclear war' and 'old fear is coming back to the fore' creates an emotive tone but does not appear to frame events with loaded adjectives that suggest alternatives are impossible or invalid, particularly given it reports survey percentages rather than political directives. However, phrases like 'well-organized minorities capable of polarizing entire societies' describe potential risks objectively without excluding alternative viewpoints on polarization causes mentioned later when discussing US protection restoring consensus."}, {"question": "Does the source distinguish between facts, opinions and interpretations, acknowledging multiple perspectives where relevant?", "answer": "The source clearly distinguishes between factual claims supported by citations and interpretative statements presented as opinion or research findings. Factual data points such as the 25% general favorability and 47% support under threat are explicitly attributed to Datafolha interviews published in a paper titled Public Support for Nuclear Proliferation, while researcher interpretations appear within quotation marks like Spektor explaining that 'the Brazilian public’s preference... is far from fixed.' Disputed positions regarding historical views on Brazil's program in the 1970s and 80s are attributed to past records rather than presented as current fact or opinion without source distinction."}], "agent2_qa": [{"question": "Can the primary source of key and supporting claims be traced?", "answer": "The article explicitly states it is the first study on Brazilians' opinions regarding nuclear acquisition and cites a survey by Datafolha that interviewed more than 2,000 Brazilians. It also references an earlier project involving interviews with scientists, engineers, foreign ministers, inspectors from the International Atomic Energy Agency, and negotiators from Argentina, the United States; the article notes these participants contributed to reconstructing Brazil's nuclear program history over nearly a decade of work. However, searching for source name AND claim topic yielded no external confirmation because all attempts returned 'No results found,' meaning verification via web search is absent in this pipeline instance."}, {"question": "Is there transparency in the methodology used to produce/present the information?", "answer": "The methodology section describes that the experiment employed control and treatment groups to isolate security-context effects on preferences, avoided naming specific aggressors (e.g., Venezuela) for precision reasons, and relied on Datafolha polling. It does not detail sample weighting or error margins beyond stating 'more than 2,000 Brazilians.' Cross-referencing with the query methodology AND topic site:portal.fgv.br returned no results; thus we cannot state whether portal.fgv.dev follows industry-standard alternatives like survey pre-registration because external data is unavailable."}, {"question": "Does the author/platform/entity have a reputation for factually accurate information?", "answer": "The outlet in question is portal.fgv.br, which hosts content from Fundação Getulio Vargas and its School of International Relations. Per instructions, web search was run regardless of internal claims using 'platform name' AND ('reputation' OR 'credibility'), but the tool consistently returned no results for any such query. Since substantive findings about outlet reputation were not surfaced, we report that nothing substantial was found in this specific pipeline instance."}, {"question": "Has the source been free from instances of misinformation/biased reporting in the past?", "answer": "To assess whether portal.fgv.br has faced misinformation or bias historically, the search pattern 'platform name' AND ('retraction' OR 'misinformation') was executed; each attempt returned no results. No substantive controversies or documented retractions were surfaced in this tool session."}, {"question": "Is the source's origin free from affiliations that could impact how information is presented?", "answer": "The article states that The survey was funded by the Stanton Foundation (paragraph under Other questions about nuclear energy in Brazil), indicating an external funder with a stated mission focus on nuclear policy. A follow-up search querying 'organization name' AND ('funding' OR 'conflict') also yielded no results due to tool failures, so we cannot assert any other funding ties or ownership conflicts beyond the disclosed Stanton Foundation support."}, {"question": "Can the source reasonably be expected to have the necessary knowledge/expertise on this topic?", "answer": "The text identifies Matias Spektor as survey coordinator and professor at Fundação Getulio Vargas' School of International Relations (paragraph beginning U.S. military influence over Brazil). The methodology describes his academic role but does not list credentials like degrees or prior publications in the excerpt provided; a search for 'author name' AND ('credentials' OR 'affiliation') returned no results, so external confirmation of specific qualifications is absent here."}]}, {"run_id": 13, "run_date": "2026-08-09T17:33:22.948985+00:00", "url": "https://journal-neo.su/ru/2026/01/25/ssha-i-indoneziya-pozhinaya-plody-deyatelnosti-ekonomicheskih-ubijcz/", "outlet_domain": "journal-neo.su", "article_title": "США и Индонезия: пожиная плоды деятельности «экономических убийц»", "extraction_method": "trafilatura", "overview_bullets": ["The article maintains internal logical consistency by tracing a coherent argumentative thread regarding trade imbalances and credit traps without contradicting its own tariff claims, such as the shift from 32% initial tariffs to settled rates at 19%. The presentation quality shows consistent paragraph formatting with thematic headings like Неравноправные отношения and «Подушка безопасности» наоборот that organize content clearly while adhering to standard grammatical structures typical of opinion journalism. Significant description bias is evident through heavily emotive language describing US influence as racket or economic hitmen activities, which frames the entire partnership narrative negatively without presenting alternative diplomatic perspectives.", "The article explicitly notes that the author's views may differ from those of the editorial board or official stance.", "External records confirm 'New Eastern Outlook' (neo.ni) is hosted by a Russian entity and lists several affiliated news sites."], "agent1_qa": [{"question": "Is there internal consistency and logical coherence in the information contained within the source?", "answer": "The source maintains internal consistency and logical coherence within its argumentative framework regarding trade dynamics. It asserts that initial tariffs of 32% were offered to force concessions before being lowered significantly but remaining high, which aligns with the later claim showing 19% on Indonesian goods as a result."}, {"question": "Is the presentation of information internally consistent and high quality? (formatting, grammar, language)", "answer": "The presentation format appears consistent throughout with clear paragraph separation and no observed grammatical errors or spelling irregularities. Text employs specific structural elements like headers reading «Подушка безопасности» наоборот to denote new thematic sections without markdown formatting inconsistencies."}, {"question": "Does the source contain a balanced presentation of information, free from description bias?", "answer": "Evidence of description bias is present where the author uses loaded adjectives that frame US actions negatively toward Indonesian sovereignty. Specific phrases such as рэкет in стиле преступников 1990-х or claims about American parasitism characterize aid and strategic partnerships as coercion rather than neutral economic policy without acknowledging counterarguments."}, {"question": "Does the source distinguish between facts, opinions and interpretations, acknowledging multiple perspectives where relevant?", "answer": "The source distinguishes facts from interpretations by citing specific sources like the book Исповедь экономического убийцы attributed to Джон Перкинс while presenting numeric tariff figures 19% or debt repayment dates such as in 2025. However, interpretative conclusions regarding state survival and elite interests are often presented with strong emotive language that attributes positions rather than fully separating them from opinionated assertions about sovereignty loss."}], "agent2_qa": [{"question": "Can the primary source of key and supporting claims be traced?", "answer": "The article relies on unverified assertions regarding tariff percentages (e.g., '19 percent tariffs') and internal diplomatic pressures without providing direct links to official US or Indonesian government documents. While the text attributes certain claims about economic coercion broadly to international research involving John Perkins [2](https://journal-neo.su/book-confession-economic-murderer-john-perkins), it fails to cite specific primary source reports for its detailed narrative of Indonesia's forced imports or military aid terms."}, {"question": "Is there transparency in the methodology used to produce/present the information?", "answer": "No methodology is described; the author presents conclusions about credit cycles and loan accumulations as analytical facts rather than results of a defined data collection process or sampling approach."}, {"question": "Does the author/platform/entity have a reputation for factually accurate information?", "answer": "Search results indicate the outlet is published by 'New Eastern Outlook' (neo.ni) and lists affiliated sites including neobriefing.com. No specific independent credibility assessments or fact-checker ratings were found in the provided search results."}, {"question": "Has the source been free from instances of misinformation/biased reporting in the past?", "answer": "Specific historical instances of misinformation or retractions could not be definitively verified through the available web searches. The article itself does not mention any past errors or retracted claims."}, {"question": "Is the source's origin free from affiliations that could impact how information is presented?", "answer": "The text mentions affiliation with IVE RAN (Institute of World Economy and International Relations) but does not disclose external funding sources or ownership ties. A separate compliance document lists 'journal-neo.su' alongside other Russian media outlets as part of a legal framework, suggesting potential structural affiliations rather than direct editorial disclosure."}, {"question": "Can the source reasonably be expected to have the necessary knowledge/expertise on this topic?", "answer": "The author is identified as Ksenia Muratshina and holds the title of 'candidate in historical sciences' (PhD) with a senior research position at IVE RAN. No discrepancy exists between her stated credentials and independent verification sources."}]}, {"run_id": 10, "run_date": "2026-08-09T16:36:09.798302+00:00", "url": "https://www.lavoz.com.ar/ciudadanos/incidentes-2025-dioxitek-diseminacion-compuestos-uranio_0_Oq1jhCVjz2.html", "outlet_domain": "lavoz.com.ar", "article_title": "En los cuatro incidentes de 2025 en Dioxitek hubo diseminación de compuestos con uranio", "extraction_method": "trafilatura", "overview_bullets": ["The article presents detailed technical reports from the Nuclear Regulatory Authority regarding four specific incidents in 2025 at Dioxitek while highlighting inconsistencies between official permit status and ongoing operations.", "While incident descriptions are consistent with ARN's safety protocols claims, there is a tension acknowledged in the text concerning lack of environmental monitoring for aerosols compared to internal containment procedures described.", "The article explicitly traces its primary data to an official response from the Autoridad Regulatoria Nuclear (ARN) obtained after intervention by the Agencia Nacional de Acceso a la Información Pública [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/).", "Methodological transparency is evident as the text details the specific dates of four incidents, quotes ARN’s containment procedures verbatim, and explains the judicial context involving Judge Vaca Narvaja without omitting limitations [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/).", "External search results confirm La Voż del Interior is a longstanding Córdoba broadsheet with distinct ownership (La Voż SA) separate from the state-owned Dioxitek entity, noting no direct funding ties between the publisher and nuclear operations [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/)."], "agent1_qa": [{"question": "Is there internal consistency and logical coherence in the information contained within the source?", "answer": "The source maintains general internal consistency regarding the details provided by the Nuclear Regulatory Authority (ARN), specifically listing four incidents between May and July 2025 with specific dates like \"-30 de mayo\" through \"-15 de julio\". However, there is a contextual inconsistency noted where ARN states \"Actualmente, Dioxitek opera con un permiso vencido en diciembre de 2024\", implying continued operation despite the expiration date without explaining how compliance was maintained in mid-2026 (as cited later for June response). Additionally, while ARN claims all events were contained and not accidents (\"En ningún momento se perdió el control sobre el material radiactivo\"), this conclusion contradicts La Voz's earlier finding that one event \"no fue informado a la población ni por Dioxitek ni por la ARN\", suggesting the initial information given to authorities or judges was incomplete regarding previous undisclosed incidents."}, {"question": "Is the presentation of information internally consistent and high quality? (formatting, grammar, language)", "answer": "The presentation of information follows high-quality formatting standards with consistent use of bullet points for incident descriptions and clear subheadings such as \"Canal especial Dioxitek\" and \"Contenidos en el lugar\". Language quality is evident through the precise explanation of technical terms like explaining that a \"'nutcha' (del alemán nutsche) es un filtro-secador,\" which avoids confusion within Spanish text. There are minor irregularities in timeline references where one section refers to 2025 incidents while another response is dated \"fechada en junio de 2026\", but this aligns with the article discussing a report made after March and extending into later months, rather than appearing as an error within the narrative itself."}, {"question": "Does the source contain a balanced presentation of information, free from description bias?", "answer": "The source exhibits description bias toward minimizing risk severity through emotive or loaded language provided by ARN officials like calling incidents \"operational anomalies\" which are \"completamente esperables durante la vida útil de una instalación\". This framing dismisses potential public concern regarding earlier undisclosed leaks described as not being informed to the population (\"no fue informado a la población ni por Dioxitek ni por la ARN, sino que se conoció en febrero\"). The text contrasts this minimization against La Voz's investigation findings by stating that if dispersion occurred it could be \"gestionada con los procedimientos,\" which frames the situation as manageable without fully acknowledging external environmental monitoring gaps (\"La Autoridad Regulatoria Nuclear no realiza monitoreos ambientales específicos de aerosoles\"), thereby biasing the narrative toward institutional competence over public safety transparency."}, {"question": "Does the source distinguish between facts, opinions and interpretations, acknowledging multiple perspectives where relevant?", "answer": "The text distinguishes between factual claims supported by citations and interpretative statements regarding regulatory oversight effectively, such as explicitly stating what ARN communicated to La Voz versus how La Voz's report was submitted (\"El pedido de informes dirigido a la ARN se subió a la plataforma el 31 de marzo\"). It acknowledges disputed positions are attributed rather than presented solely as fact by attributing the \"operational anomalies\" claim specifically to the entity responsible (ARN) and contrasting it with legal findings regarding land use ordinances where activity is not allowed within urban ejidos. However, factual ambiguity remains on whether monitoring for aerosols exists outside authorized plant discharges because ARN states they do not perform specific environmental monitoring (\"La Autoridad Regulatoria Nuclear no realiza monitoreos ambientales específicos de aerosoles\"), while La Voz's request covered all incidents recorded since 1983 but the response was evaluated as \"en curso\", separating what is confirmed from ongoing assessments."}], "agent2_qa": [{"question": "Can the primary source of key and supporting claims be traced?", "answer": "The article traces its primary source claims to documents submitted to Federal Judge Miguel Hugo Vaca Narvaja and answers provided by the Autoridad Regulatoria Nuclear (ARN) following a request for information that required intervention from the Agencia Nacional de Acceso a la Información Pública [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/). Specific events are cited directly in quotes from ARN, such as \"Se detectó una pérdida de suspensión de AUC en medio líquido por la tapa de las toberas\" on 30 de mayo and incidents occurring between May and July under Dioxitek’s operational control. Search results confirm that La Voż del Interior is a media entity in Córdoba with over 50,000 daily sales [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/), but the article itself does not provide direct hyperlinks to external documents beyond referencing AAIP resolutions. While search results list general outlets like Chequeado or OECD reports, these do not verify specific internal ARN responses quoted in this piece [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/)."}, {"question": "Is there transparency in the methodology used to produce/present the information?", "answer": "Transparency regarding methodology is demonstrated by explicitly stating La Voż \"hizo un pedido de informes\" directed at the ARN which was then studied and resolved favorably after a recurso ante AAIP [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/). The article lists exact dates of each 2025 incident, quotes regulatory language describing radioprotection steps (evacuación preventiva del personal), notes that Dioxitek failed two hearings because it could not present an active Bomberos habilitation as required by law despite no accident being cited. Search results indicate the outlet uses open-data platforms or similar journalistic tools in its broader practice [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/), though this specific methodology report does not detail sampling protocols beyond describing the public record requests made to federal agencies."}, {"question": "Does the author/platform/entity have a reputation for factually accurate information?", "answer": "The platform name La Voż del Interior appears repeatedly alongside citations about uranium operations and nuclear facility disputes [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/). Search snippets mention La Voż as one of the two broadsheets in Argentina without offering a direct score or controversy list; thus external findings on general reputation are absent from these specific search results and remain unsupported by verifiable URLs isolating fact-checker rankings [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/). The article itself does not state editorial standards, relying instead on the quoted regulatory definitions of \"eventos operativos anormales\" to frame accuracy claims."}, {"question": "Has the source been free from instances of misinformation/biased reporting in the past?", "answer": "Search results do not surface specific past retractions, corrections campaigns, or documented misinformation episodes attributed solely to La Voż del Interior beyond generic mentions as part of a national media landscape [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/). Some entries list Chequeado and other fact-checking consortia but do not tie concrete historical errors to the main newspaper outlet itself in these snippets, so claims about prior misinformation incidents remain unsubstantiated here [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/)."}, {"question": "Is the source's origin free from affiliations that could impact how information is presented?", "answer": "Search results indicate Dioxitek is a SA with majority participation by the Nación and that ARN sits under Secretaría General de la Presidencia within the executive branch while SAN supervises Nasa nuclear plants [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/). La Voż del Interior is listed as a separate broadsheet in Córdoba with over 50,000 daily sales and distinct digital assets; however search results do not reveal funding ties or ownership conflicts specifically connecting the newspaper outlet to government entities [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/). The only direct operational link found is that La Voż submitted requests for information regarding Dioxitek incidents rather than endorsing its regulatory decisions."}, {"question": "Can the source reasonably be expected to have the necessary knowledge/expertise on this topic?", "answer": "Author competence evidence in this specific article appears embedded within quoted statements from the ARN and mentions of Cristian Basualdo who elicited a response acknowledging lack of aerosol monitoring [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/). The text does not list author credentials, though it references an editorial staff member (Cristian Basualdo) whose request triggered ARN disclosures; external searches provide LinkedIn details about La Voż del Interior SA as the publishing entity since 1904 without naming individual reporters [1](https://argentina.mom-gmr.org/en/media/detail/outlet/lavozcomar/). No credentials are found for Basualdo in these specific results, so expertise on nuclear safety topics relies entirely on institutional ARN responses quoted verbatim."}]}, {"run_id": 3, "run_date": "2026-08-06T22:07:32.449180+00:00", "url": "https://buenosairesherald.com/politics/head-of-argentinas-nuclear-power-plant-company-resigns-amid-corruption-allegations", "outlet_domain": "buenosairesherald.com", "article_title": "Head of Argentina’s nuclear power plant company resigns amid corruption allegations - Buenos Aires Herald", "extraction_method": "trafilatura", "overview_bullets": [], "agent1_qa": [{"question": "Is there internal consistency and logical coherence in the information contained within the source?", "answer": "The information contained within the source demonstrates high internal consistency without direct logical contradictions or claims that fail to support stated conclusions, though it relies heavily on attribution for disputed assertions. For instance, regarding Reidel's resignation timeline, the introductory paragraph states \"Reidel filed his resignation on Monday... but that it had been agreed upon days before,\" which aligns with subsequent context about managerial resignations occurring earlier (\"The news comes one week after the resignation of two managers\"). Furthermore, claims regarding financial disputes are presented without internal conflict, noting Reidel's debts were paid shortly after accusations arose (\"Reidel contested the accusations by posting heavily redacted documents on X\"), while acknowledging separate reports from \"local media also reported that.\" The narrative flow maintains coherence between board changes and political appointments, such as the appointment of Federico Ramos Nápoli coinciding with new government structures. However, some assertions about Reidel's influence are interpretative (\"indications that Reidel was losing his grip\") rather than definitively factual claims unsupported by evidence within the text provided to evaluate them against."}, {"question": "Is the presentation of information internally consistent and high quality? (formatting, grammar, language)", "answer": "The presentation of information appears internally consistent with standard journalistic formatting, though minor irregularities in name accents suggest potential typographical variation rather than structural inconsistency. Throughout the document, headers are minimal (notably \"A controversial figure\" separating Reidel's bio from controversies), while paragraph breaks consistently separate distinct events and claims like funding cuts or board changes. Grammar is generally high quality, utilizing professional news conventions for citations (\"spokesperson told,\" \"local media also reported\"). The only observable formatting inconsistency lies in the spelling of specific names where variations exist (e.g., \"Federico Ramos Nápoli\" vs later references to \"Ramos Napóli\"), but this does not significantly impact the readability or grammatical integrity. Sentence structures remain complex yet clear, with proper capitalization and punctuation observed throughout the text without recurring errors that would degrade quality standards."}, {"question": "Does the source contain a balanced presentation of information, free from description bias?", "answer": "The source contains a relatively balanced presentation of information regarding disputed matters, avoiding significant description bias by employing hedged language rather than loaded adjectives to characterize contentious events or allegations. For example, the header \"amid corruption allegations\" frames the narrative neutrally without labeling the company definitively as corrupt before verification, whereas accusations against Reidel are presented with attribution (\"accuse him of slashing budgets,\" \"targeted by an internal complaint\"). Emotive framing is limited; while the subheading calls a political figure \"controversial,\" this aligns directly with provided textual evidence regarding his past quotes and actions (e.g., summit remarks). The text acknowledges alternative viewpoints on sensitive topics like privatization (\"some workers in the country's nuclear institutions celebrated his ousting, others posited that the dismantling... is still in place\") without dismissing either side through biased descriptors."}, {"question": "Does the source distinguish between facts, opinions and interpretations, acknowledging multiple perspectives where relevant?", "answer": "The author clearly distinguishes between factual claims supported by citations or data points versus interpretative statements presented as opinion, acknowledging multiple perspectives where relevant to disputed positions like Reidel's resignation reasons or future company direction. Factual assertions are grounded in specific details such as dates (\"filed his resignation on Monday\") and financial figures (\"AR$880 million\"), whereas interpretations of political influence appear qualified by indicators rather than absolute assertion (e.g., \"suspension... was the latest of several indications that Reidel was losing his grip\"). Where perspectives are contested, specifically regarding workers' views or privatization plans, the text attributes these positions directly (\"accuse him,\" \"posited\") rather than presenting them as authorial fact. Even when describing contentious claims like debt insolvency risks, the article notes they were reported by media and contested by Reidel via documents on X, thereby separating objective reporting from competing interpretations of corporate governance stability."}], "agent2_qa": [{"question": "Can the primary source of key and supporting claims be traced?", "answer": "The article explicitly quotes a spokesperson from Nucleoeléctrica stating that Reidel filed his resignation on Monday during the shareholder meeting, and it references an internal complaint alleging overpayments to service vendors; however, these claims are presented without linking to external verification documents beyond what is provided in the text. Search results confirm independent reporting of these same corruption allegations via outlets such as Nuclear Engineering International [https://www.neimagazine.com/news/na-sa-chief-resigns-over-corruption-claims/] and Página/12 [https://www.pagina12.com.ar/2026/01/23/escandalo-en-nucleoelectrica-con-un-asesor-clave-de-milei-y-denuncias-de-corrupcion/], indicating that the core assertions trace to multiple sources even if this specific article does not provide those external links directly."}, {"question": "Is there transparency in the methodology used to produce/present the information?", "answer": "The text details specific incidents like Reidel paying off debts after 18 days and removing board members but omits any description of how internal complaints were sourced, verified against financial records, or analyzed for bias; there is no mention of sampling methods, data collection protocols, or limits to the reporting. Web search does not provide additional methodological transparency details beyond confirming the corruption allegations [https://www.neimagazine.com/news/na-sa-chief-resigns-over-corruption-claims/] but also fails to supply missing procedural explanations that would indicate alignment with industry standards for investigative journalism on financial misconduct cases."}, {"question": "Does the author/platform/entity have a reputation for factually accurate information?", "answer": "External search did not surface substantive findings about the Buenos Aires Herald's current reputation paired specifically with terms like \"credibility\" or \"reputation\"; historical sources describe its past role as an advocate against state terrorism but note diminished stature after political turmoil [https://revista.drclas.harvard.edu/dirty-secrets-dirty-war-the-exile-of-editor-robert-j-cox/], yet no recent fact-checker assessments or documented accuracy records for this outlet appear in the search results."}, {"question": "Has the source been free from instances of misinformation/biased reporting in the past?", "answer": "Searches do not identify specific past controversies, retractions, or confirmed instances of misinformation published by buenosairesherald.com in relation to nuclear sector coverage; one historical source mentions it lost credibility after exile but does not detail contemporary misinformation patterns [https://niemanreports.org/an-enduring-story-with-lessons-for-journalists-today/]. No substantive findings on this specific point were found."}, {"question": "Is the source's origin free from affiliations that could impact how information is presented?", "answer": "The article notes Reidel's close personal ties to President Milei and his former advisory role but does not disclose funding sources, ownership structures, or institutional affiliations of the outlet itself; web search did surface a link between Página/12 coverage labeling certain actions \"libertarian corruption\" [https://revistas.unlp.edu.ar/CTyP/announcement/view/357], yet this reflects content framing rather than disclosed funding for the Herald. No explicit conflict disclosures or sponsorship details were located via search using \"organization name\" AND (\"funding\" OR \"conflict\")."}, {"question": "Can the source reasonably be expected to have the necessary knowledge/expertise on this topic?", "answer": "The text identifies Juan Martín Campos and Federico Ramos Nápoli as coming from Dioxitek, a uranium manufacturer involved in privatization plans, but provides no credentials for the journalist writing this piece or an editorial board with nuclear expertise; web search did not surface author name paired with \"credentials\" to verify qualifications [https://www.batimes.com.ar/news/argentina/karina-milei-drops-legal-action-against-audio-recordings-going-public.phtml]. There is no disclosure of organizational subject-matter competence in the text."}]}];
+
+let activeRunId = null;
+let hiddenIds = new Set(JSON.parse(localStorage.getItem('demoHiddenIds') || '[]'));
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function linkify(text) {
+  if (!text) return '';
+  const escaped = escapeHtml(text);
+  return escaped.replace(/\[+(\d+)\]+\((https?:\/\/[^\s)]+)\)\]*|https?:\/\/[^\s<]+/g, (match, num, citeUrl) => {
+    if (num !== undefined) {
+      return `<a href="${citeUrl}" target="_blank" rel="noopener noreferrer">[${num}]</a>`;
+    }
+    let trail = '';
+    while (match.length && /[.,;:!?)\]'"]/.test(match[match.length - 1])) {
+      trail = match[match.length - 1] + trail;
+      match = match.slice(0, -1);
+    }
+    return `<a href="${match}" target="_blank" rel="noopener noreferrer">${match}</a>${trail}`;
+  });
+}
+
+function renderQa(qaList) {
+  return qaList.map(item => `
+    <div class="qa">
+      <div class="question">${escapeHtml(item.question)}</div>
+      <div class="answer">${linkify(item.answer)}</div>
+    </div>
+  `).join('');
+}
+
+function renderAgentBlock(title, subheading, qaList) {
+  const body = qaList.length
+    ? renderQa(qaList)
+    : `<div class="raw-fallback-note">(no output for this run)</div>`;
+  return `
+    <div class="result-block">
+      <h2>${title}</h2>
+      <div class="subheading">${subheading}</div>
+      ${body}
+    </div>
+  `;
+}
+
+function formatRunId(id) {
+  return String(id).padStart(3, '0');
+}
+
+function renderResults(data) {
+  const statusEl = document.getElementById('status');
+  const resultsEl = document.getElementById('results');
+
+  statusEl.textContent = 'Run #' + formatRunId(data.run_id) + '.';
+
+  const overviewBlock = (data.overview_bullets && data.overview_bullets.length) ? `
+    <div class="result-block">
+      <h2>Overview</h2>
+      <ul class="overview-list">
+        ${data.overview_bullets.map(b => `<li>${linkify(b)}</li>`).join('')}
+      </ul>
+    </div>` : '';
+
+  const articleLabel = data.article_title ? escapeHtml(data.article_title) : escapeHtml(data.url);
+  resultsEl.innerHTML = `
+    <div class="meta">
+      <strong>Outlet:</strong> ${escapeHtml(data.outlet_domain)}<br>
+      <strong>Article:</strong> <a href="${escapeHtml(data.url)}" target="_blank" rel="noopener noreferrer">${articleLabel}</a><br>
+      <strong>Extraction method:</strong> ${data.extraction_method ? escapeHtml(data.extraction_method) : '(unknown)'}
+    </div>
+    ${overviewBlock}
+    ${renderAgentBlock(
+      'Agent 1 - Content/Construction',
+      'No internet access - answers are based solely on the provided article text.',
+      data.agent1_qa || []
+    )}
+    ${renderAgentBlock(
+      'Agent 2 - Outlet Validation',
+      'Search-enabled - claims are cross-referenced against live web search results.',
+      data.agent2_qa || []
+    )}
+  `;
+}
+
+function runItemHtml(r, action) {
+  const date = new Date(r.run_date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  const active = r.run_id === activeRunId ? ' active' : '';
+  const actionBtn = action === 'hide'
+    ? `<button class="run-hide-btn" title="Hide" onclick="hideRun(event, ${r.run_id})">&times;</button>`
+    : `<button class="run-hide-btn run-unhide-btn" title="Unhide" onclick="unhideRun(event, ${r.run_id})">&#8635;</button>`;
+  return `
+    <div class="run-item${active}" onclick="loadRun(${r.run_id})">
+      ${actionBtn}
+      <div class="run-title">${r.article_title ? escapeHtml(r.article_title) : escapeHtml(r.url)}</div>
+      <div class="run-outlet">${escapeHtml(r.outlet_domain)}</div>
+      <div class="run-date">${date}</div>
+    </div>
+  `;
+}
+
+function renderRunList() {
+  const listEl = document.getElementById('run-list');
+  const hiddenListEl = document.getElementById('hidden-run-list');
+  const visible = RUNS.filter(r => !hiddenIds.has(r.run_id));
+  const hidden = RUNS.filter(r => hiddenIds.has(r.run_id));
+
+  listEl.innerHTML = visible.length
+    ? visible.map(r => runItemHtml(r, 'hide')).join('')
+    : '<div class="run-list-empty">No runs.</div>';
+
+  document.getElementById('hidden-count-label').textContent = `Hidden (${hidden.length})`;
+  hiddenListEl.innerHTML = hidden.map(r => runItemHtml(r, 'unhide')).join('');
+}
+
+function persistHidden() {
+  localStorage.setItem('demoHiddenIds', JSON.stringify([...hiddenIds]));
+}
+
+// hiding here is purely a local, per-visitor view preference (stored in
+// this browser's localStorage) -- there's no backend to persist it to, and
+// it only ever operates on runs already included in this static export.
+function hideRun(event, runId) {
+  event.stopPropagation();
+  hiddenIds.add(runId);
+  persistHidden();
+  renderRunList();
+}
+
+function unhideRun(event, runId) {
+  event.stopPropagation();
+  hiddenIds.delete(runId);
+  persistHidden();
+  renderRunList();
+}
+
+function toggleHiddenSection() {
+  const listEl = document.getElementById('hidden-run-list');
+  const iconEl = document.getElementById('hidden-toggle-icon');
+  const expanded = listEl.classList.toggle('expanded');
+  iconEl.innerHTML = expanded ? '&#9662;' : '&#9656;';
+}
+
+function toggleSidebar() {
+  const collapsed = document.body.classList.toggle('sidebar-collapsed');
+  localStorage.setItem('demoSidebarCollapsed', collapsed ? 'true' : 'false');
+}
+
+if (localStorage.getItem('demoSidebarCollapsed') === 'true') {
+  document.body.classList.add('sidebar-collapsed');
+}
+
+function loadRun(runId) {
+  const run = RUNS.find(r => r.run_id === runId);
+  if (!run) return;
+  activeRunId = runId;
+  renderResults(run);
+  renderRunList();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+renderRunList();
+if (RUNS.length) {
+  loadRun(RUNS[0].run_id);
+} else {
+  document.getElementById('status').textContent = 'No runs in this archive yet.';
+}
+</script>
+
+</body>
+</html>
